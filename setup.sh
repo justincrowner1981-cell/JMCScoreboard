@@ -53,11 +53,11 @@ echo ""
 # ── Step 1: Install dependencies ──────────────────────────────────────────────
 step "Installing dependencies (--no-install-recommends saves ~200MB)"
 apt-get update -y || die "apt-get update failed. Check your internet connection."
-apt-get install -y --no-install-recommends   python3 python3-pip python3-dev git build-essential   libgraphicsmagick++-dev libwebp-dev
+apt-get install -y --no-install-recommends   python3 python3-dev cython3 git build-essential   libgraphicsmagick++-dev libwebp-dev
 if [ $? -ne 0 ]; then
   echo "  First attempt failed. Retrying in 15s..."
   sleep 15
-  apt-get install -y --no-install-recommends     python3 python3-pip python3-dev git build-essential     libgraphicsmagick++-dev libwebp-dev     || die "Failed to install dependencies after 2 attempts. Check your internet connection."
+  apt-get install -y --no-install-recommends     python3 python3-dev cython3 git build-essential     libgraphicsmagick++-dev libwebp-dev     || die "Failed to install dependencies after 2 attempts. Check your internet connection."
 fi
 ok "Dependencies installed"
 
@@ -105,14 +105,22 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  apt-get install -y --no-install-recommends python3-dev cython3     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3"
+  # Verify cython3 is available before attempting the build
+  python3 -c "import Cython" 2>/dev/null || die "cython3 not found — run: apt-get install -y cython3"
+  python3-config --includes >/dev/null 2>&1 || die "python3-dev not found — run: apt-get install -y python3-dev"
 
-  # Use the classic Makefile approach — zero PyPI downloads required.
-  # This compiles the Cython extension and copies it into site-packages
-  # using only packages already installed via apt.
   cd "$LIB_DIR/bindings/python"
-  make build-python PYTHON=python3     && ok "Python bindings compiled"     || die "make build-python failed — check cython3 and python3-dev are installed"
-  make install-python PYTHON=python3     && ok "Python bindings installed"     || die "make install-python failed"
+
+  # Try Makefile approach first (preferred — zero PyPI downloads)
+  if make build-python PYTHON=python3 2>&1; then
+    ok "Python bindings compiled (make)"
+    make install-python PYTHON=python3       && ok "Python bindings installed"       || die "make install-python failed"
+  else
+    # Fallback: build via setup.py directly (works on all distros)
+    warn "make build-python failed — falling back to setup.py"
+    python3 setup.py build       && ok "Python bindings compiled (setup.py)"       || die "setup.py build failed — check cython3 and python3-dev"
+    python3 setup.py install       && ok "Python bindings installed (setup.py)"       || die "setup.py install failed"
+  fi
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
