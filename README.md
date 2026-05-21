@@ -19,24 +19,22 @@ Supports live score polling, broadcast sync delay, and auto-start on boot.
 
 ---
 
-## Quick Start
+## Quick Start — One Command Install
+
+SSH into your Pi and run this single command. It downloads all files, installs dependencies, and reboots automatically.
 
 ```bash
-# 1. Copy files to your Pi
-scp scoreboard.py setup.sh autostart.sh scoreboard.service pi@scoreboard.local:~/
+# Step 1 — SSH into your Pi
+ssh pi@raspberrypi.local
 
-# 2. SSH in and run setup (takes ~5 min)
-ssh pi@scoreboard.local
-sudo bash setup.sh
+# Step 2 — Run the bootstrap installer (does everything)
+curl -fsSL https://raw.githubusercontent.com/justincrowner1981-cell/JMCScoreboard/main/install.sh | sudo bash
 
-# 3. Reboot
-sudo reboot
-
-# 4. Test
+# Step 3 — After reboot, test the scoreboard
 sudo python3 ~/scoreboard/scoreboard.py
 
-# 5. (Optional) Enable auto-start on boot
-sudo bash autostart.sh
+# Step 4 — (Optional) Enable auto-start on every boot
+cd ~/scoreboard && sudo bash autostart.sh
 ```
 
 ---
@@ -100,8 +98,9 @@ Edit the constants at the top of `scoreboard.py`:
 
 | File | Purpose |
 |------|---------|
+| `install.sh` | **Bootstrap** — one curl command installs everything |
 | `scoreboard.py` | Main scoreboard (runs on Pi) |
-| `setup.sh` | One-click dependency installer |
+| `setup.sh` | One-click dependency installer (called by install.sh) |
 | `autostart.sh` | Enable auto-start on boot |
 | `scoreboard.service` | systemd service definition |
 | `README.md` | This file |
