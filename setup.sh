@@ -1,11 +1,15 @@
 #!/bin/bash
 #======================================================
 #  JMC Pi Scoreboard - One-Click Setup
-#  Raspberry Pi + Adafruit RGB Matrix Bonnet/HAT
+#  Optimised for low-bandwidth / slow connections
 #  Usage: sudo bash setup.sh
 #======================================================
 
-# No set -e — we handle errors manually with clear messages
+# Prevent apt from hanging waiting for user input
+export DEBIAN_FRONTEND=noninteractive
+# Kill git if it stalls (no data for 30s, or total transfer < 1KB/s for 60s)
+export GIT_HTTP_LOW_SPEED_LIMIT=1024
+export GIT_HTTP_LOW_SPEED_TIME=60
 
 RED=$(printf '\033[0;31m')
 GREEN=$(printf '\033[0;32m')
@@ -21,6 +25,19 @@ ok()   { echo "  ${GREEN}[OK]${NC}  $1"; }
 warn() { echo "  ${YELLOW}[!!]${NC}  $1"; }
 die()  { echo ""; echo "${RED}FAILED: $1${NC}"; echo ""; exit 1; }
 
+# Retry wrapper: retry_cmd <attempts> <delay_sec> <cmd...>
+retry_cmd() {
+  local attempts=$1; local delay=$2; shift 2
+  local i=1
+  while [ $i -le $attempts ]; do
+    "$@" && return 0
+    echo "  [!!] Attempt $i/$attempts failed. Retrying in ${delay}s..."
+    sleep $delay
+    i=$((i+1))
+  done
+  return 1
+}
+
 echo ""
 echo "${CYAN}${BOLD}  ======================================"
 echo "    JMC Pi NHL Scoreboard - Setup"
@@ -34,8 +51,8 @@ PI_MODEL=$(grep "Model" /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xarg
 echo ""
 
 # ── Step 1: Install dependencies ──────────────────────────────────────────────
-step "Installing dependencies"
-apt-get install -y python3 python3-pip python3-dev git build-essential   libgraphicsmagick++-dev libwebp-dev   || die "Failed to install dependencies. Try running: apt-get update first."
+step "Installing dependencies (--no-install-recommends saves ~200MB)"
+retry_cmd 3 15 apt-get install -y --no-install-recommends   python3 python3-pip python3-dev git build-essential   libgraphicsmagick++-dev libwebp-dev   || die "Failed to install dependencies after 3 attempts. Run: apt-get update && sudo bash setup.sh"
 ok "Dependencies installed"
 
 # ── Step 2: Clone rpi-rgb-led-matrix ──────────────────────────────────────────
@@ -43,21 +60,25 @@ step "Setting up rpi-rgb-led-matrix library"
 HOME_DIR="/home/${SUDO_USER:-pi}"
 LIB_DIR="${HOME_DIR}/rpi-rgb-led-matrix"
 if [ -d "$LIB_DIR" ]; then
-  warn "Already exists — pulling updates..."
-  git -C "$LIB_DIR" pull --quiet && ok "Library updated" || warn "Pull failed, using existing copy"
+  warn "Already exists — skipping clone (using existing copy)"
+  ok "Library present at $LIB_DIR"
 else
-  git clone --depth=1 https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"     && ok "Cloned to $LIB_DIR" || die "git clone failed. Check internet connection."
+  echo "  Cloning (shallow — minimal download)..."
+  # --depth=1 --single-branch: only fetches latest commit of one branch (~5MB vs ~50MB)
+  retry_cmd 3 15 git clone     --depth=1 --single-branch --branch master     --config transfer.fsckObjects=false     https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"     || die "git clone failed after 3 attempts. Check internet connection."
+  ok "Cloned to $LIB_DIR"
 fi
 
 # ── Step 3: Build C library ───────────────────────────────────────────────────
-step "Building C library (takes ~1-2 minutes)"
-make -C "$LIB_DIR/lib" -j$(nproc)   && ok "C library compiled" || die "C library build failed. Check gcc/make are installed."
+step "Building C library (~1-3 minutes on Pi Zero)"
+# HARDWARE_DESC= keeps the build lean (no extra demo binaries)
+make -C "$LIB_DIR/lib" -j$(nproc) HARDWARE_DESC=adafruit-hat   && ok "C library compiled"   || die "C library build failed. Is build-essential installed?"
 
 # ── Step 4: Build and install Python bindings ─────────────────────────────────
 step "Building Python bindings"
 cd "$LIB_DIR/bindings/python"
-make build-python PYTHON=$(which python3)   && ok "Python bindings built" || die "Python bindings build failed."
-make install-python PYTHON=$(which python3)   && ok "Python bindings installed" || die "Python bindings install failed."
+make build-python PYTHON=$(which python3)   && ok "Python bindings built"   || die "Python bindings build failed."
+make install-python PYTHON=$(which python3)   && ok "Python bindings installed"   || die "Python bindings install failed."
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
 step "Configuring boot settings (disabling audio for matrix PWM)"
@@ -80,7 +101,7 @@ fi
 
 # ── Step 6: Verify ────────────────────────────────────────────────────────────
 step "Verifying installation"
-python3 -c "import rgbmatrix; print('rgbmatrix: OK')"   && ok "rgbmatrix module importable"   || warn "Import test failed — try rebooting first, then re-run this script"
+python3 -c "import rgbmatrix; print('rgbmatrix: OK')"   && ok "rgbmatrix module importable"   || warn "Import test failed — reboot first, then re-run if needed"
 
 echo ""
 echo "${GREEN}${BOLD}  ======================================"
