@@ -65,13 +65,22 @@ ok "Dependencies installed"
 step "Setting up rpi-rgb-led-matrix library"
 HOME_DIR="/home/${SUDO_USER:-pi}"
 LIB_DIR="${HOME_DIR}/rpi-rgb-led-matrix"
-if [ -d "$LIB_DIR" ]; then
-  warn "Already exists — skipping clone (using existing copy)"
-  ok "Library present at $LIB_DIR"
+# A complete clone always has a Makefile at the root
+if [ -f "$LIB_DIR/Makefile" ]; then
+  ok "Library already fully cloned — skipping to Step 3"
+elif [ -d "$LIB_DIR" ]; then
+  warn "Partial/incomplete clone detected — removing and re-cloning..."
+  rm -rf "$LIB_DIR"
+  echo "  Cloning (shallow, minimal download ~5MB)..."
+  timeout 300 git clone --depth=1 --single-branch --branch master     https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"
+  if [ $? -ne 0 ]; then
+    echo "  First attempt failed. Retrying in 10s..."
+    sleep 10
+    timeout 300 git clone --depth=1 --single-branch --branch master       https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"       || die "git clone failed after 2 attempts. Check internet connection."
+  fi
+  ok "Cloned to $LIB_DIR"
 else
   echo "  Cloning (shallow, minimal download ~5MB)..."
-  # Use timeout to kill a stalled clone after 5 minutes
-  # --depth=1 --single-branch: only latest commit, one branch
   timeout 300 git clone --depth=1 --single-branch --branch master     https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"
   if [ $? -ne 0 ]; then
     echo "  First attempt failed. Retrying in 10s..."
