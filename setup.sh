@@ -105,15 +105,14 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  apt-get install -y --no-install-recommends python3-dev cython3 python3-pip     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3 / python3-pip"
+  apt-get install -y --no-install-recommends python3-dev cython3     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3"
 
-  # Per upstream README: run pip from the library ROOT (not bindings/python)
-  cd "$LIB_DIR"
-
-  # --no-build-isolation = use already-installed system cython3 (avoids downloading
-  # cython from PyPI/piwheels, which fails on slow/flaky Pi WiFi connections).
-  # --break-system-packages bypasses PEP 668 on Bookworm+.
-  pip3 install --break-system-packages --no-build-isolation .     && ok "Python bindings installed"     || die "pip3 install failed — check cython3 and python3-dev are present"
+  # Use the classic Makefile approach — zero PyPI downloads required.
+  # This compiles the Cython extension and copies it into site-packages
+  # using only packages already installed via apt.
+  cd "$LIB_DIR/bindings/python"
+  make build-python PYTHON=python3     && ok "Python bindings compiled"     || die "make build-python failed — check cython3 and python3-dev are installed"
+  make install-python PYTHON=python3     && ok "Python bindings installed"     || die "make install-python failed"
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
