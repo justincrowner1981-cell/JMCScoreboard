@@ -63,9 +63,15 @@ if [ -d "$LIB_DIR" ]; then
   warn "Already exists — skipping clone (using existing copy)"
   ok "Library present at $LIB_DIR"
 else
-  echo "  Cloning (shallow — minimal download)..."
-  # --depth=1 --single-branch: only fetches latest commit of one branch (~5MB vs ~50MB)
-  retry_cmd 3 15 git clone     --depth=1 --single-branch --branch master     --config transfer.fsckObjects=false     https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"     || die "git clone failed after 3 attempts. Check internet connection."
+  echo "  Cloning (shallow, minimal download ~5MB)..."
+  # Use timeout to kill a stalled clone after 5 minutes
+  # --depth=1 --single-branch: only latest commit, one branch
+  timeout 300 git clone --depth=1 --single-branch --branch master     https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"
+  if [ $? -ne 0 ]; then
+    echo "  First attempt failed. Retrying in 10s..."
+    sleep 10
+    timeout 300 git clone --depth=1 --single-branch --branch master       https://github.com/hzeller/rpi-rgb-led-matrix.git "$LIB_DIR"       || die "git clone failed after 2 attempts. Check internet connection."
+  fi
   ok "Cloned to $LIB_DIR"
 fi
 
