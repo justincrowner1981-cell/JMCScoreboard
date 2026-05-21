@@ -105,22 +105,16 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  # Verify cython3 is available before attempting the build
+  # Verify build tools are present
   python3 -c "import Cython" 2>/dev/null || die "cython3 not found — run: apt-get install -y cython3"
-  python3-config --includes >/dev/null 2>&1 || die "python3-dev not found — run: apt-get install -y python3-dev"
 
-  cd "$LIB_DIR/bindings/python"
+  BINDINGS_DIR="$LIB_DIR/bindings/python"
+  [ -d "$BINDINGS_DIR" ] || die "Bindings directory not found: $BINDINGS_DIR — did the clone succeed?"
 
-  # Try Makefile approach first (preferred — zero PyPI downloads)
-  if make build-python PYTHON=python3 2>&1; then
-    ok "Python bindings compiled (make)"
-    make install-python PYTHON=python3       && ok "Python bindings installed"       || die "make install-python failed"
-  else
-    # Fallback: build via setup.py directly (works on all distros)
-    warn "make build-python failed — falling back to setup.py"
-    python3 setup.py build       && ok "Python bindings compiled (setup.py)"       || die "setup.py build failed — check cython3 and python3-dev"
-    python3 setup.py install       && ok "Python bindings installed (setup.py)"       || die "setup.py install failed"
-  fi
+  # make build-python / make install-python must be run from the LIBRARY ROOT
+  make -C "$LIB_DIR" build-python PYTHON=python3     && ok "Python bindings compiled"     || die "make build-python failed. Check cython3 and python3-dev are installed."
+
+  make -C "$LIB_DIR" install-python PYTHON=python3     && ok "Python bindings installed"     || die "make install-python failed"
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
