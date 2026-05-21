@@ -52,7 +52,13 @@ echo ""
 
 # ── Step 1: Install dependencies ──────────────────────────────────────────────
 step "Installing dependencies (--no-install-recommends saves ~200MB)"
-retry_cmd 3 15 apt-get install -y --no-install-recommends   python3 python3-pip python3-dev git build-essential   libgraphicsmagick++-dev libwebp-dev   || die "Failed to install dependencies after 3 attempts. Run: apt-get update && sudo bash setup.sh"
+apt-get update -y || die "apt-get update failed. Check your internet connection."
+apt-get install -y --no-install-recommends   python3 python3-pip python3-dev git build-essential   libgraphicsmagick++-dev libwebp-dev
+if [ $? -ne 0 ]; then
+  echo "  First attempt failed. Retrying in 15s..."
+  sleep 15
+  apt-get install -y --no-install-recommends     python3 python3-pip python3-dev git build-essential     libgraphicsmagick++-dev libwebp-dev     || die "Failed to install dependencies after 2 attempts. Check your internet connection."
+fi
 ok "Dependencies installed"
 
 # ── Step 2: Clone rpi-rgb-led-matrix ──────────────────────────────────────────
