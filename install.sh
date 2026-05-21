@@ -47,12 +47,22 @@ echo ""
 
 # ── Step 1: Update package lists ──────────────────────────────────────────────
 info "Step 1/5: Updating apt package lists..."
-retry_cmd 3 10 apt-get update -y   || die "apt-get update failed after 3 attempts. Check your internet connection."
+apt-get update
+if [ $? -ne 0 ]; then
+  echo "  Retrying in 10s..."
+  sleep 10
+  apt-get update || die "apt-get update failed. Check your internet connection."
+fi
 ok "Package lists updated"
 
 # ── Step 2: Install curl and git ──────────────────────────────────────────────
 info "Step 2/5: Installing curl and git..."
-retry_cmd 3 10 apt-get install -y --no-install-recommends curl git   || die "Failed to install curl/git after 3 attempts."
+apt-get install -y --no-install-recommends curl git
+if [ $? -ne 0 ]; then
+  echo "  Retrying in 10s..."
+  sleep 10
+  apt-get install -y --no-install-recommends curl git     || die "Failed to install curl/git. Check your internet connection."
+fi
 ok "curl and git ready"
 
 # ── Step 3: Create destination directory ──────────────────────────────────────
@@ -65,11 +75,8 @@ info "Step 4/5: Downloading scoreboard files from GitHub..."
 for FILE in $FILES; do
   URL="${REPO}/${FILE}"
   echo "    Downloading ${FILE}..."
-  # --retry 3: retry on transient failures
-  # --connect-timeout 30: don't hang forever trying to connect
-  # --max-time 60: kill if a single file takes more than 60s (small files)
-  # --retry-delay 5: wait 5s between retries
-  retry_cmd 3 5 curl -fsSL --connect-timeout 30 --max-time 60 --retry 3 --retry-delay 5     "$URL" -o "${DEST}/${FILE}"     || die "Failed to download $FILE after 3 attempts.\nCheck internet and that the repo is public: $URL"
+  # curl handles its own retries; no wrapper needed
+  curl -fsSL --connect-timeout 30 --max-time 60 --retry 3 --retry-delay 5     "$URL" -o "${DEST}/${FILE}"     || die "Failed to download $FILE. Check internet and that the repo is public: $URL"
   ok "$FILE"
 done
 
