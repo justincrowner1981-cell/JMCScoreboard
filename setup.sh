@@ -105,10 +105,26 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  # The repo now uses pip/scikit-build-core — install Cython deps then pip install
-  apt-get install -y --no-install-recommends python3-dev cython3     && ok "Cython deps installed"     || die "Failed to install python3-dev/cython3"
+  # Install build deps
+  apt-get install -y --no-install-recommends python3-dev cython3 cmake python3-pip     && ok "Build deps installed"     || die "Failed to install build deps"
   cd "$LIB_DIR/bindings/python"
-  pip3 install .     && ok "Python bindings installed"     || die "pip3 install failed. Check cython3 and python3-dev are installed."
+  # Try pip with --break-system-packages first (needed on PEP 668 / bookworm)
+  if pip3 install --break-system-packages . 2>/dev/null; then
+    ok "Python bindings installed (--break-system-packages)"
+  elif pip3 install . 2>/dev/null; then
+    ok "Python bindings installed"
+  else
+    # Last resort: install into a venv and symlink so rgbmatrix is importable system-wide
+    warn "pip3 blocked — trying via virtual environment..."
+    apt-get install -y --no-install-recommends python3-venv       || die "Failed to install python3-venv"
+    python3 -m venv /opt/rgbmatrix-venv --system-site-packages
+    /opt/rgbmatrix-venv/bin/pip install --upgrade pip
+    /opt/rgbmatrix-venv/bin/pip install .       || die "venv pip install failed"
+    # Symlink the built package into the system site-packages so 'import rgbmatrix' works
+    SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])")
+    VENV_PKG=$(/opt/rgbmatrix-venv/bin/python3 -c "import site; print(site.getsitepackages()[0])")
+    ln -sf "${VENV_PKG}/rgbmatrix" "${SITE_PKG}/rgbmatrix" 2>/dev/null       && ok "Python bindings symlinked to system site-packages"       || warn "Symlink failed — you may need to activate the venv: source /opt/rgbmatrix-venv/bin/activate"
+  fi
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
