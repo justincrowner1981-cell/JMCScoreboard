@@ -105,9 +105,10 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  # build-python and install-python targets live in the repo root Makefile
-  make -C "$LIB_DIR" build-python PYTHON=$(which python3)     && ok "Python bindings built"     || die "Python bindings build failed."
-  make -C "$LIB_DIR" install-python PYTHON=$(which python3)     && ok "Python bindings installed"     || die "Python bindings install failed."
+  # The repo now uses pip/scikit-build-core — install Cython deps then pip install
+  apt-get install -y --no-install-recommends python3-dev cython3     && ok "Cython deps installed"     || die "Failed to install python3-dev/cython3"
+  cd "$LIB_DIR/bindings/python"
+  pip3 install .     && ok "Python bindings installed"     || die "pip3 install failed. Check cython3 and python3-dev are installed."
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
