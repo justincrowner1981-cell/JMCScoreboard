@@ -92,14 +92,23 @@ fi
 
 # ── Step 3: Build C library ───────────────────────────────────────────────────
 step "Building C library (~1-3 minutes on Pi Zero)"
-# HARDWARE_DESC= keeps the build lean (no extra demo binaries)
-make -C "$LIB_DIR/lib" -j$(nproc) HARDWARE_DESC=adafruit-hat   && ok "C library compiled"   || die "C library build failed. Is build-essential installed?"
+# Check if the .a library file already exists (proof of a successful build)
+if [ -f "$LIB_DIR/lib/librgbmatrix.a" ]; then
+  ok "C library already built — skipping"
+else
+  make -C "$LIB_DIR/lib" -j$(nproc)     && ok "C library compiled"     || die "C library build failed. Is build-essential installed? Run: apt-get install -y build-essential"
+fi
 
 # ── Step 4: Build and install Python bindings ─────────────────────────────────
 step "Building Python bindings"
-cd "$LIB_DIR/bindings/python"
-make build-python PYTHON=$(which python3)   && ok "Python bindings built"   || die "Python bindings build failed."
-make install-python PYTHON=$(which python3)   && ok "Python bindings installed"   || die "Python bindings install failed."
+# Check if rgbmatrix is already importable (already installed)
+if python3 -c "import rgbmatrix" 2>/dev/null; then
+  ok "Python bindings already installed — skipping"
+else
+  cd "$LIB_DIR/bindings/python"
+  make build-python PYTHON=$(which python3)     && ok "Python bindings built"     || die "Python bindings build failed."
+  make install-python PYTHON=$(which python3)     && ok "Python bindings installed"     || die "Python bindings install failed."
+fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
 step "Configuring boot settings (disabling audio for matrix PWM)"
