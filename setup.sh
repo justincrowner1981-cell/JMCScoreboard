@@ -108,11 +108,12 @@ else
   apt-get install -y --no-install-recommends python3-dev cython3 python3-pip     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3 / python3-pip"
 
   # Per upstream README: run pip from the library ROOT (not bindings/python)
-  # The pyproject.toml/setup.py that knows how to build the Cython extension lives there.
   cd "$LIB_DIR"
 
-  # --break-system-packages bypasses PEP 668 on Bookworm+
-  pip3 install --break-system-packages .     && ok "Python bindings installed"     || die "pip3 install failed — check cython3 and python3-dev are present"
+  # --no-build-isolation = use already-installed system cython3 (avoids downloading
+  # cython from PyPI/piwheels, which fails on slow/flaky Pi WiFi connections).
+  # --break-system-packages bypasses PEP 668 on Bookworm+.
+  pip3 install --break-system-packages --no-build-isolation .     && ok "Python bindings installed"     || die "pip3 install failed — check cython3 and python3-dev are present"
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
