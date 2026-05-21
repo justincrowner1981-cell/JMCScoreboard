@@ -1,0 +1,14 @@
+[Unit]
+Description=JMC Pi NHL Scoreboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/scoreboard
+ExecStart=/usr/bin/python3 /home/pi/scoreboard/scoreboard.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
