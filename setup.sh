@@ -105,15 +105,14 @@ step "Building Python bindings"
 if python3 -c "import rgbmatrix" 2>/dev/null; then
   ok "Python bindings already installed — skipping"
 else
-  apt-get install -y --no-install-recommends python3-dev cython3 python3-pip python3-setuptools     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3 / python3-pip / python3-setuptools"
+  apt-get install -y --no-install-recommends python3-dev cython3 python3-pip     && ok "Build deps installed"     || die "Failed to install python3-dev / cython3 / python3-pip"
 
-  cd "$LIB_DIR/bindings/python"
+  # Per upstream README: run pip from the library ROOT (not bindings/python)
+  # The pyproject.toml/setup.py that knows how to build the Cython extension lives there.
+  cd "$LIB_DIR"
 
-  # Build the C extension in-place first (produces rgbmatrix/*.so)
-  python3 setup.py build_ext --inplace 2>/dev/null     || python3 -m pip install --break-system-packages --no-build-isolation cython        && python3 setup.py build_ext --inplace
-
-  # Install into system site-packages, bypassing PEP 668 on Bookworm / newer OS
-  python3 -m pip install --break-system-packages --no-build-isolation .     && ok "Python bindings installed"     || die "Python bindings install failed. Check that cython3 and python3-dev are present."
+  # --break-system-packages bypasses PEP 668 on Bookworm+
+  pip3 install --break-system-packages .     && ok "Python bindings installed"     || die "pip3 install failed — check cython3 and python3-dev are present"
 fi
 
 # ── Step 5: Configure boot settings ──────────────────────────────────────────
